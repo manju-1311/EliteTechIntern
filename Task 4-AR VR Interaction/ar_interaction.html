@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionDecor AR + AI Scan | Manju R</title>
+    <!-- Font Awesome for AR Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /* --- 1. CORE LAYOUT --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body, html { height: 100%; overflow: hidden; background: #000; }
+
+        /* --- 2. AR CAMERA FEED SIMULATION --- */
+        .ar-container {
+            width: 100%;
+            height: 100%;
+            background: url('https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1600&q=80');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- 3. EXTRA FEATURE: AI SCANNING OVERLAY --- */
+        /* This line moves across the screen to simulate AI environment analysis */
+        .ai-scanner-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #00d2ff, transparent);
+            box-shadow: 0 0 15px #00d2ff;
+            top: -10%;
+            display: none; /* Hidden until activated */
+            z-index: 10;
+        }
+
+        .scanning-active .ai-scanner-line {
+            display: block;
+            animation: scanMove 2s infinite ease-in-out;
+        }
+
+        @keyframes scanMove {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+
+        /* --- 4. SPATIAL UI ELEMENTS --- */
+        /* The Floor Reticle (Placement Indicator) */
+        .reticle {
+            width: 120px;
+            height: 60px;
+            border: 2px dashed rgba(0, 210, 255, 0.8);
+            border-radius: 50%;
+            position: absolute;
+            transform: rotateX(70deg); /* Perspective tilt */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .reticle-dot {
+            width: 10px;
+            height: 10px;
+            background: #00d2ff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00d2ff;
+        }
+
+        /* --- 5. GLASSMORPHIC HUD (Heads-Up Display) --- */
+        .hud-panel {
+            position: absolute;
+            bottom: 30px;
+            width: 90%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 30px;
+            padding: 20px;
+            color: white;
+            z-index: 20;
+        }
+
+        .catalog {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+
+        .item {
+            min-width: 70px;
+            height: 70px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: 0.3s;
+            border: 1px solid transparent;
+        }
+
+        .item.active {
+            background: rgba(0, 210, 255, 0.2);
+            border-color: #00d2ff;
+        }
+
+        /* --- 6. FLOATING AI BUTTON (The Extra Feature Toggle) --- */
+        .ai-btn {
+            position: absolute;
+            top: 40px;
+            right: 20px;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+            color: white;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
+            z-index: 30;
+        }
+
+        /* --- 7. VIRTUAL OBJECT --- */
+        #placed-object {
+            position: absolute;
+            width: 200px;
+            display: none;
+            filter: drop-shadow(0 30px 20px rgba(0,0,0,0.6));
+            transition: transform 0.3s ease;
+        }
+
+        /* Tooltip text */
+        .instruction {
+            position: absolute;
+            top: 100px;
+            text-align: center;
+            color: white;
+            width: 100%;
+            font-size: 0.9rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body id="mainBody">
+
+    <div class="ar-container">
+        <!-- AI Scanning Line -->
+        <div class="ai-scanner-line"></div>
+
+        <!-- Instruction Text -->
+        <p class="instruction" id="statusText">Aim at floor to place furniture</p>
+
+        <!-- The Extra Feature Toggle -->
+        <button class="ai-btn" onclick="toggleAIScan()">
+            <i class="fas fa-robot"></i> LUMINA-AI SCAN
+        </button>
+
+        <!-- AR Surface Reticle -->
+        <div class="reticle" id="reticle">
+            <div class="reticle-dot"></div>
+        </div>
+
+        <!-- Virtual Object (Sofa) -->
+        <img id="placed-object" src="https://cdn-icons-png.flaticon.com/512/2603/2603741.png" alt="Sofa Model">
+
+        <!-- Bottom HUD Panel -->
+        <div class="hud-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; font-weight: bold;">FURNITURE CATALOG</span>
+                <span id="ai-status" style="font-size: 0.7rem; color: #00d2ff; display: none;">AI Sync Active</span>
+            </div>
+            
+            <div class="catalog">
+                <div class="item active">🛋️</div>
+                <div class="item">🪑</div>
+                <div class="item">💡</div>
+                <div class="item">🌿</div>
+            </div>
+
+            <button onclick="placeFurniture()" style="width: 100%; margin-top: 20px; padding: 15px; border-radius: 15px; border: none; background: #00d2ff; color: white; font-weight: bold; cursor: pointer;">
+                PLACE OBJECT
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * SCRIPT LOGIC: AR INTERACTION & AI SCAN
+         * Maintainer: Manju R
+         */
+
+        let isAIScanActive = false;
+
+        // EXTRA FEATURE: Toggle AI Room Analysis
+        function toggleAIScan() {
+            const body = document.getElementById('mainBody');
+            const aiStatus = document.getElementById('ai-status');
+            const statusText = document.getElementById('statusText');
+
+            isAIScanActive = !isAIScanActive;
+
+            if (isAIScanActive) {
+                body.classList.add('scanning-active');
+                statusText.innerText = "AI Analyzing Room Lighting & Colors...";
+                
+                // Simulate AI finding a match after 2 seconds
+                setTimeout(() => {
+                    body.classList.remove('scanning-active');
+                    aiStatus.style.display = 'block';
+                    statusText.innerText = "Lumina-Sync: Colors Matched to your Interior!";
+                    // Apply a 'warm' filter to the sofa to match room lighting
+                    document.getElementById('placed-object').style.filter = "sepia(0.3) brightness(0.9)";
+                }, 2000);
+            }
+        }
+
+        // CORE FEATURE: Place Furniture on Reticle
+        function placeFurniture() {
+            const obj = document.getElementById('placed-object');
+            const reticle = document.getElementById('reticle');
+            const statusText = document.getElementById('statusText');
+
+            // 1. Hide the placement guide
+            reticle.style.display = 'none';
+
+            // 2. Display the 3D Model
+            obj.style.display = 'block';
+            obj.style.top = '40%'; // Aligning to perceived 'floor' in image
+            
+            // 3. Trigger 'Physical Drop' animation
+            obj.animate([
+                { transform: 'translateY(-50px) scale(0.8)', opacity: 0 },
+                { transform: 'translateY(0) scale(1)', opacity: 1 }
+            ], {
+                duration: 600,
+                easing: 'ease-out'
+            });
+
+            statusText.innerText = "Object Anchored. Use two fingers to rotate.";
+        }
+    </script>
+</body>
+</html>
